@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tinfoil Verifier</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+<script src="wasm_exec.js"></script>
+<script>
+    function verify() {
+        let digest = document.getElementById("digest").value;
+        let domain = document.getElementById("domain").value;
+        let log = document.getElementById("log");
+        log.innerText = "";
+
+        function addLog(message) {
+            let timestamp = new Date().toLocaleString();
+            log.innerText += `${timestamp} - ${message}\n`;
+        }
+
+        addLog(`Verifying ${domain} against EIF digest ${digest}`);
+        addLog("Loading WASM verifier");
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("tinfoil-verifier.wasm"), go.importObject).then((result) => {
+            go.run(result.instance);
+            addLog("WASM verifier loaded");
+
+            let bundleURL = "https://api.github.com/repos/tinfoilanalytics/nitro-enclave-pipeline-test/attestations/sha256:" + digest;
+            addLog("Fetching attestation bundle from " + bundleURL);
+            let sigstorePromise = fetch(bundleURL)
+                .catch(error => {
+                    addLog("Failed to fetch attestation bundle from Sigstore: " + error);
+                    addLog("Verification failed");
+                })
+                .then(response => {
+                    if (response.status !== 200) {
+                        addLog("Failed to fetch attestation bundle from Sigstore: " + response.status);
+                        addLog("Verification failed");
+
+                    } else {
+                        return response.json();
+                    }
+                })
+                .then(data => {
+                    let bundle = data.attestations[0].bundle;
+                    addLog("Verifying sigstore signature");
+                    let sigstoreMeasurements = JSON.parse(verifySigstore(digest, JSON.stringify(bundle)));
+                    addLog("Sigstore PCR0: " + sigstoreMeasurements.PCR0);
+                    addLog("Sigstore PCR1: " + sigstoreMeasurements.PCR1);
+                    addLog("Sigstore PCR2: " + sigstoreMeasurements.PCR2);
+                    return sigstoreMeasurements;
+                });
+
+            let nitroAttestationURL = `https://${domain}/.well-known/nitro-attestation`;
+            addLog("Fetching nitro signed attestation from " + nitroAttestationURL);
+            let nitroPromise = fetch(nitroAttestationURL)
+                .catch(error => {
+                    addLog("Failed to fetch nitro attestation: " + error);
+                    addLog("Verification failed");
+                })
+                .then(response => {
+                    if (response.status !== 201) {
+                        addLog("Failed to fetch nitro attestation: " + response.status);
+                        addLog("Verification failed");
+
+                    } else {
+                        return response.json();
+                    }
+                })
+                .then(nitroAttestation => {
+                    let nitroMeasurements = JSON.parse(verifyNitro(nitroAttestation));
+                    addLog("Nitro PCR0: " + nitroMeasurements.PCR0);
+                    addLog("Nitro PCR1: " + nitroMeasurements.PCR1);
+                    addLog("Nitro PCR2: " + nitroMeasurements.PCR2);
+                    return nitroMeasurements;
+                });
+
+            // Wait for both to finish and print both
+            Promise.all([sigstorePromise, nitroPromise]).then(([sigstoreMeasurements, nitroMeasurements]) => {
+                let failed = false;
+                for (let i = 0; i < 3; i++) {
+                    let sigstorePCR = sigstoreMeasurements["PCR" + i];
+                    let nitroPCR = nitroMeasurements["PCR" + i];
+
+                    if (sigstorePCR !== nitroPCR) {
+                        addLog(`PCR${i} mismatch`);
+                        failed = true;
+                    } else {
+                        addLog(`PCR${i} match`);
+                    }
+                }
+
+                if (failed) {
+                    addLog("Verification failed");
+                } else {
+                    addLog("Verification successful! ✅");
+                }
+            });
+        });
+    }
+
+    window.addEventListener("load", function () {
+        verify();
+    });
+</script>
+</body>
+
+<div class="container mx-auto p-4">
+    <div>
+
+        <h1 class="text-2xl font-bold">Tinfoil Verifier</h1>
+
+        <p class="text-gray-600">
+            This page demonstrates how to verify the attestation of a Nitro Enclave using the Tinfoil
+            verifier. See our <a
+                class="text-blue-500"
+                href="https://github.com/tinfoilanalytics/verifier">verifier code on GitHub</a> for more information.
+        </p>
+
+        <div
+                class="border border-gray-200 p-4 mt-4"
+        >
+            <div class="flex flex-row gap-4 w-full mb-5">
+                <div class="w-[60%]">
+                    <p class="text-gray-600 mb-2">EIF image hash (sha256):</p>
+                    <input
+                            id="digest"
+                            class="border border-gray-200 p-2 w-full"
+                            type="text"
+                            value="cabdc1385f1f69e2a19215b4cdc153d6843b26e0e570ccf423408a8b7598e935">
+                </div>
+                <div class="w-[30%]">
+                    <p class="text-gray-600 mb-2">URL:</p>
+                    <input
+                            id="domain"
+                            class="border border-gray-200 p-2 w-full"
+                            type="text"
+                            value="attestation-demo.tinfoil.sh">
+                </div>
+                <div class="w-[10%] flex items-end">
+                    <button class="bg-emerald-500 text-white px-4 py-2 w-full" onclick="verify()">Verify</button>
+                </div>
+            </div>
+
+            <div
+                    id="log"
+                    class="bg-white p-4 border border-gray-200"
+            ></div>
+        </div>
+    </div>
+</div>
+
+</html>
