@@ -21,11 +21,13 @@ func verifySigstore() js.Func {
 	return js.FuncOf(func(this js.Value, args []js.Value) any {
 		digest := args[0].String()
 		bundleBytes := []byte(args[1].String())
+		repo := args[2].String()
 
 		sigstoreMeasurements, err := sigstore.VerifyAttestedMeasurements(
 			trustedRootBytes,
 			bundleBytes,
 			digest,
+			repo,
 		)
 		if err != nil {
 			panic(err)
