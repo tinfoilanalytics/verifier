@@ -10,7 +10,7 @@
 <script src="wasm_exec.js"></script>
 <script>
     function verify() {
-        let repo = "tinfoilanalytics/nitro-private-inference-image"
+        let repo = document.getElementById("repo").value;
         let digest = document.getElementById("digest").value;
         let domain = document.getElementById("domain").value;
         let log = document.getElementById("log");
@@ -28,7 +28,7 @@
             go.run(result.instance);
             addLog("WASM verifier loaded");
 
-            let bundleURL = "https://api.github.com/repos/"+repo+"/attestations/sha256:" + digest;
+            let bundleURL = "https://api.github.com/repos/" + repo + "/attestations/sha256:" + digest;
             addLog("Fetching attestation bundle from " + bundleURL);
             let sigstorePromise = fetch(bundleURL)
                 .catch(error => {
@@ -124,7 +124,7 @@
                 class="border border-gray-200 p-4 mt-4"
         >
             <div class="flex flex-row gap-4 w-full mb-5">
-                <div class="w-[60%]">
+                <div class="w-[50%]">
                     <p class="text-gray-600 mb-2">EIF image hash (sha256):</p>
                     <input
                             id="digest"
@@ -132,7 +132,7 @@
                             type="text"
                             value="c6a7de8bd85b58d958a64ee244453fa49165fa35864c8a5af333ee65b922cc8d">
                 </div>
-                <div class="w-[30%]">
+                <div class="w-[20%]">
                     <p class="text-gray-600 mb-2">URL:</p>
                     <input
                             id="domain"
@@ -140,7 +140,15 @@
                             type="text"
                             value="inference-demo.tinfoil.sh">
                 </div>
-                <div class="w-[10%] flex items-end">
+                <div class="w-[30%]">
+                    <p class="text-gray-600 mb-2">Repo:</p>
+                    <input
+                            id="repo"
+                            class="border border-gray-200 p-2 w-full"
+                            type="text"
+                            value="tinfoilanalytics/nitro-private-inference-image">
+                </div>
+                <div class="w-[5%] flex items-end">
                     <button class="bg-emerald-500 text-white px-4 py-2 w-full" onclick="verify()">Verify</button>
                 </div>
             </div>
