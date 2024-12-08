@@ -8,7 +8,9 @@ import (
 	"encoding/base64"
 	"syscall/js"
 
-	"github.com/tinfoilanalytics/verifier/pkg/nitro"
+	"github.com/blocky/nitrite"
+
+	"github.com/tinfoilanalytics/verifier/pkg/models"
 	"github.com/tinfoilanalytics/verifier/pkg/sigstore"
 )
 
@@ -44,12 +46,11 @@ func verifyNitro() js.Func {
 			panic(err)
 		}
 
-		nitroMeasurements, err := nitro.VerifyAttestation(attDocBytes)
+		att, err := nitrite.Verify(attDocBytes, nitrite.VerifyOptions{})
 		if err != nil {
 			panic(err)
 		}
-
-		return nitroMeasurements.String()
+		return models.MeasurementFromDoc(att.Document).String()
 	})
 }
 
